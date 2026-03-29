@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuthStore } from "../store/authStore";
 import api from "../api/axios";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { Loader2, Mail, Lock, Gem } from "lucide-react";
+import { Loader2, Mail, Lock } from "lucide-react";
 import { AxiosError } from "axios";
 import { AuthResponse } from "../types";
 
@@ -67,13 +67,8 @@ export default function Login() {
                 />
 
                 <div className="relative z-10 text-center px-12 max-w-lg">
-                    <div className="inline-flex h-20 w-20 items-center justify-center rounded-2xl mb-8"
-                        style={{
-                            background: "linear-gradient(135deg, #d4a853 0%, #c49a3c 50%, #a17f2e 100%)",
-                            boxShadow: "0 8px 32px rgba(212, 168, 83, 0.3)",
-                        }}
-                    >
-                        <Gem className="h-10 w-10 text-white" strokeWidth={1.8} />
+                    <div className="mb-8 flex justify-center">
+                        <img src="/ahi-logo.svg" alt="Ahi Jewellery" className="h-[150px] w-auto drop-shadow-[0_8px_28px_rgba(212,168,83,0.22)]" />
                     </div>
 
                     <h1 className="text-4xl font-bold text-white tracking-tight mb-4">
@@ -100,10 +95,8 @@ export default function Login() {
                 <div className="w-full max-w-[400px]">
                     {/* Mobile brand header */}
                     <div className="lg:hidden text-center mb-10">
-                        <div className="inline-flex h-14 w-14 items-center justify-center rounded-xl mb-4"
-                            style={{ background: "linear-gradient(135deg, #d4a853 0%, #a17f2e 100%)" }}
-                        >
-                            <Gem className="h-7 w-7 text-white" strokeWidth={1.8} />
+                        <div className="mb-4 flex justify-center">
+                            <img src="/ahi-logo.svg" alt="Ahi Jewellery" className="h-[100px] w-auto" />
                         </div>
                         <h1 className="text-2xl font-bold text-gray-900">Ahi Jewellery</h1>
                     </div>

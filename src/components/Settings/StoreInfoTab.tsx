@@ -25,7 +25,7 @@ export default function StoreInfoTab({ data, onSave, isSaving }: StoreInfoTabPro
                 contactPhone: data.store.contactPhone || "",
                 gstNumber: data.store.gstNumber || "",
                 address: data.store.address || "",
-                logoUrl: data.store.logoUrl || "",
+                logoUrl: data.store.logoUrl || "/ahi-logo.svg",
             });
         }
     }, [data]);

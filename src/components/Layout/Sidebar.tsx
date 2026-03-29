@@ -14,7 +14,6 @@ import {
     BarChart3,
     Settings,
     LogOut,
-    Gem,
     LayoutTemplate,
 } from "lucide-react";
 import { cn } from "../../utils";
@@ -95,9 +94,7 @@ const Sidebar = () => {
         <div className="flex h-full w-[252px] flex-col bg-white border-r border-gray-100 z-10">
             {/* Brand Header */}
             <div className="flex h-[72px] items-center gap-3 px-6 border-b border-gray-100 flex-shrink-0">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-gold-400 to-brand-gold-600 shadow-sm">
-                    <Gem className="h-4 w-4 text-white" strokeWidth={2.5} />
-                </div>
+                <img src="/ahi-logo.svg" alt="Ahi Jewellery" className="h-[68px] w-auto shrink-0" />
                 <div className="flex flex-col">
                     <span className="text-sm font-bold text-gray-900 leading-tight">Ahi Jewellery</span>
                     <span className="text-[10px] text-gray-400 font-medium">Admin Dashboard</span>
