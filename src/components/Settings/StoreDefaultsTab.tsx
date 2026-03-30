@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Save, Loader2, Weight, Ruler, Hash } from "lucide-react";
+import api from "../../api/axios";
+import toast from "react-hot-toast";
 
 interface StoreDefaultsTabProps {
     data: any;
@@ -39,6 +41,7 @@ export default function StoreDefaultsTab({ data, onSave, isSaving }: StoreDefaul
         orderDigits: 5,
         orderIncludeYear: true,
     });
+    const [isResetting, setIsResetting] = useState(false);
 
     useEffect(() => {
         if (data && data.defaults) {
@@ -80,6 +83,18 @@ export default function StoreDefaultsTab({ data, onSave, isSaving }: StoreDefaul
             orderIncludeYear: Boolean(formData.orderIncludeYear),
         };
         onSave({ defaults: payload });
+    };
+
+    const handleResetCounter = async () => {
+        setIsResetting(true);
+        try {
+            const res = await api.post("/settings/reset-order-counter");
+            toast.success(res.data.message || "Order counter reset successfully.");
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || "Failed to reset order counter.");
+        } finally {
+            setIsResetting(false);
+        }
     };
 
     // Live preview
@@ -187,16 +202,30 @@ export default function StoreDefaultsTab({ data, onSave, isSaving }: StoreDefaul
 
                     {/* Live Preview */}
                     <div className="mt-2 pt-4 border-t border-gray-200">
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Live Preview</p>
-                        <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-5 py-3.5 shadow-sm">
-                            <div className="h-8 w-8 rounded-lg bg-brand-gold-50 flex items-center justify-center shrink-0">
-                                <Hash className="h-4 w-4 text-brand-gold-600" />
+                        <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Live Preview</p>
+                                <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-5 py-3.5 shadow-sm">
+                                    <div className="h-8 w-8 rounded-lg bg-brand-gold-50 flex items-center justify-center shrink-0">
+                                        <Hash className="h-4 w-4 text-brand-gold-600" />
+                                    </div>
+                                    <span className="font-mono text-base font-bold text-gray-900 tracking-wide">{preview}</span>
+                                </div>
+                                <p className="text-[11px] text-gray-400 mt-2">
+                                    New orders will be assigned IDs in this format. Existing orders are not affected.
+                                </p>
                             </div>
-                            <span className="font-mono text-base font-bold text-gray-900 tracking-wide">{preview}</span>
+                            <div className="ml-5 mt-6 shrink-0">
+                                <button type="button" onClick={handleResetCounter} disabled={isResetting} 
+                                    className="px-4 py-2 border border-gray-200 rounded-lg text-xs font-semibold hover:bg-gray-50 flex items-center gap-2 transition-colors disabled:opacity-50 text-gray-700 bg-white">
+                                    {isResetting ? <Loader2 className="w-3 h-3 animate-spin text-gray-400" /> : <Hash className="w-3 h-3 text-gray-400" />}
+                                    Reset Sequence
+                                </button>
+                                <p className="text-[10px] text-gray-400 mt-2 text-center max-w-[120px]">
+                                    Force resets checkout counter to {Math.pow(10, formData.orderDigits - 1)}
+                                </p>
+                            </div>
                         </div>
-                        <p className="text-[11px] text-gray-400 mt-2">
-                            New orders will be assigned IDs in this format. Existing orders are not affected.
-                        </p>
                     </div>
                 </div>
             </div>
