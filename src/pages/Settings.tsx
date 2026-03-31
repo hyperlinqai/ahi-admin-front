@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, Building2, CreditCard, Truck, BellRing, Loader2, ShieldAlert, SlidersHorizontal } from "lucide-react";
+import { Users, Building2, CreditCard, Truck, BellRing, Loader2, ShieldAlert, SlidersHorizontal, ScrollText } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { useAuthStore } from "../store/authStore";
@@ -12,8 +12,9 @@ import StoreDefaultsTab from "../components/Settings/StoreDefaultsTab";
 import PaymentTab from "../components/Settings/PaymentTab";
 import ShippingTab from "../components/Settings/ShippingTab";
 import NotificationsTab from "../components/Settings/NotificationsTab";
+import StorePoliciesTab from "../components/Settings/StorePoliciesTab";
 
-type TabId = "store" | "defaults" | "payment" | "shipping" | "notifications" | "users";
+type TabId = "store" | "defaults" | "payment" | "shipping" | "policies" | "notifications" | "users";
 
 interface Tab {
     id: TabId;
@@ -47,6 +48,12 @@ const tabs: Tab[] = [
         label: "Shipping & Delivery",
         icon: Truck,
         description: "Default charges and free shipping thresholds",
+    },
+    {
+        id: "policies",
+        label: "Store Policies",
+        icon: ScrollText,
+        description: "Jewellery care, shipping info, and return policies",
     },
     {
         id: "notifications",
@@ -240,6 +247,9 @@ export default function Settings() {
                                     )}
                                     {activeTab === "shipping" && (
                                         <ShippingTab data={settings} onSave={handleSave} isSaving={isSaving} />
+                                    )}
+                                    {activeTab === "policies" && (
+                                        <StorePoliciesTab data={settings} onSave={handleSave} isSaving={isSaving} />
                                     )}
                                     {activeTab === "notifications" && (
                                         <NotificationsTab data={settings} onSave={handleSave} isSaving={isSaving} />

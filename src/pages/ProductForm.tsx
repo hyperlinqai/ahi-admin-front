@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, Reorder } from "framer-motion";
 import api from "../api/axios";
-import { X, Upload, ChevronLeft, Loader2, Star, Check, Globe, Weight, Trash2, AlertTriangle, Plus } from "lucide-react";
+import { X, Upload, ChevronLeft, Loader2, Star, Check, Globe, Weight, Trash2, AlertTriangle, Plus, FileText, Diamond, Truck, RefreshCw, Info } from "lucide-react";
 import { settingsApi } from "../api/settings";
 import imageCompression from "browser-image-compression";
+import TipTapEditor from "../components/TipTapEditor";
 
 // ─── Types ───────────────────────────────────────────────────
 interface ProductImage {
@@ -24,7 +25,38 @@ interface Category {
     id: string;
     name: string;
     slug: string;
+    children?: Category[];
 }
+
+// Flatten category tree for dropdown display
+const flattenCategories = (cats: Category[], prefix = ""): Category[] => {
+    let result: Category[] = [];
+    cats.forEach(c => {
+        result.push({ ...c, name: `${prefix}${c.name}` });
+        if (c.children && c.children.length > 0) {
+            result = result.concat(flattenCategories(c.children, `${prefix}— `));
+        }
+    });
+    return result;
+};
+
+// ─── Section Tab Component ──────────────────────────────────
+interface SectionTab {
+    id: string;
+    label: string;
+    icon: React.ReactNode;
+}
+
+const sectionTabs: SectionTab[] = [
+    { id: "basic", label: "Basic Info", icon: <Info className="h-4 w-4" /> },
+    { id: "description", label: "Description", icon: <FileText className="h-4 w-4" /> },
+    { id: "details", label: "Product Details", icon: <Weight className="h-4 w-4" /> },
+    { id: "care", label: "Jewellery Care", icon: <Diamond className="h-4 w-4" /> },
+    { id: "shipping", label: "Shipping Info", icon: <Truck className="h-4 w-4" /> },
+    { id: "return", label: "Return & Exchange", icon: <RefreshCw className="h-4 w-4" /> },
+    { id: "images", label: "Images", icon: <Upload className="h-4 w-4" /> },
+    { id: "seo", label: "SEO", icon: <Globe className="h-4 w-4" /> },
+];
 
 // ─── Main Component ─────────────────────────────────────────
 export default function ProductForm() {
@@ -35,6 +67,7 @@ export default function ProductForm() {
 
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(isEdit);
+    const [activeSection, setActiveSection] = useState("basic");
 
     const [weightUnit, setWeightUnit] = useState("g");
     const [dimensionUnit, setDimensionUnit] = useState("mm");
@@ -50,6 +83,11 @@ export default function ProductForm() {
         length: "" as number | string,
         width: "" as number | string,
         height: "" as number | string,
+        material: "",
+        features: "",
+        careInstructions: "",
+        shippingInfo: "",
+        returnPolicy: "",
         metaTitle: "",
         metaDescription: "",
         metaKeywords: "",
@@ -74,7 +112,7 @@ export default function ProductForm() {
     // Fetch Categories & Store Units
     useEffect(() => {
         api.get("/categories")
-            .then((res) => setCategories(res.data.data || []))
+            .then((res) => setCategories(flattenCategories(res.data.data || [])))
             .catch((err) => console.error("Failed to load categories", err));
 
         settingsApi.getSettings()
@@ -105,6 +143,11 @@ export default function ProductForm() {
                         length: product.length ?? "",
                         width: product.width ?? "",
                         height: product.height ?? "",
+                        material: product.material || "",
+                        features: product.features || "",
+                        careInstructions: product.careInstructions || "",
+                        shippingInfo: product.shippingInfo || "",
+                        returnPolicy: product.returnPolicy || "",
                         metaTitle: product.metaTitle || "",
                         metaDescription: product.metaDescription || "",
                         metaKeywords: product.metaKeywords || "",
@@ -175,11 +218,10 @@ export default function ProductForm() {
         setError("");
         try {
             let validVariants: ProductVariant[] = [];
-            
+
             if (hasVariants) {
                 validVariants = variants.filter((v) => v.name && v.value && v.sku);
             } else if (form.sku) {
-                // To safely update the default variant, find its ID if it exists
                 const existingDefault = variants.length === 1 ? variants[0].id : undefined;
                 validVariants = [{
                     id: existingDefault,
@@ -201,6 +243,11 @@ export default function ProductForm() {
                 length: form.length !== "" ? Number(form.length) : undefined,
                 width: form.width !== "" ? Number(form.width) : undefined,
                 height: form.height !== "" ? Number(form.height) : undefined,
+                material: form.material || undefined,
+                features: form.features || undefined,
+                careInstructions: form.careInstructions || undefined,
+                shippingInfo: form.shippingInfo || undefined,
+                returnPolicy: form.returnPolicy || undefined,
                 metaTitle: form.metaTitle || undefined,
                 metaDescription: form.metaDescription || undefined,
                 metaKeywords: form.metaKeywords || undefined,
@@ -217,12 +264,11 @@ export default function ProductForm() {
             if (isEdit) {
                 await api.put(`/products/${id}`, body);
                 productId = id as string;
-                
-                // Dispatch reordered image sequence safely 
+
                 if (existingImages.length > 0) {
                     await api.put(`/products/${id}/images/reorder`, {
                         imageOrder: existingImages.map(img => img.id)
-                    }).catch(console.error); // Do not brutally fail product edits on sequence fails natively
+                    }).catch(console.error);
                 }
             } else {
                 const res = await api.post("/products", body);
@@ -233,7 +279,7 @@ export default function ProductForm() {
             if (newFiles.length > 0) {
                 setUploadingImages(true);
                 const formData = new FormData();
-                
+
                 const options = {
                     maxSizeMB: 1,
                     maxWidthOrHeight: 1920,
@@ -245,8 +291,8 @@ export default function ProductForm() {
                         const compressedFile = await imageCompression(f, options);
                         formData.append("images", compressedFile, f.name);
                     } catch (error) {
-                        console.error("Compression natively failed:", error);
-                        formData.append("images", f); // Fallback unconditionally structurally
+                        console.error("Compression failed:", error);
+                        formData.append("images", f);
                     }
                 }
 
@@ -256,7 +302,6 @@ export default function ProductForm() {
                 setUploadingImages(false);
             }
 
-            // Go back to products list
             navigate("/products");
         } catch (err: any) {
             setError(err?.response?.data?.error || err?.response?.data?.message || "Failed to save product");
@@ -274,7 +319,7 @@ export default function ProductForm() {
     }
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl mx-auto pb-12">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-5xl mx-auto pb-16">
 
             {/* Header */}
             <div className="flex items-center gap-4 mb-6">
@@ -287,267 +332,367 @@ export default function ProductForm() {
                 </div>
             </div>
 
-            {/* Form Content */}
-            <div className="glass-card p-6 md:p-8 space-y-8">
+            {/* Layout: Sidebar Tabs + Content */}
+            <div className="flex flex-col md:flex-row gap-6">
 
-                {/* Basic Info */}
-                <section className="space-y-4">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 border-b border-gray-100 pb-2">Basic Information</h3>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
-                            <input type="text" value={form.title} onChange={(e) => handleFieldChange("title", e.target.value)} placeholder="e.g. Diamond Solitaire Ring"
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                        </div>
-
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
-                            <textarea rows={4} value={form.description} onChange={(e) => handleFieldChange("description", e.target.value)} placeholder="Detailed product description..."
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none resize-y transition-all" />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹) *</label>
-                            <input type="number" value={form.price} onChange={(e) => handleFieldChange("price", e.target.value)} min="0" step="1"
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
-                            <input type="text" value={form.brand} onChange={(e) => handleFieldChange("brand", e.target.value)} placeholder="e.g. Ahi"
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
-                            <select value={form.categoryId} onChange={(e) => handleFieldChange("categoryId", e.target.value)}
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none bg-white transition-all cursor-pointer">
-                                <option value="">Select category</option>
-                                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-                        </div>
-                        
-                        <div className="md:col-span-2 pt-2 pb-2">
-                            <label className="flex items-center gap-3 cursor-pointer p-4 bg-brand-gold-50/50 rounded-xl border border-brand-gold-100">
-                                <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${hasVariants ? 'bg-brand-gold-500' : 'bg-gray-300'}`}>
-                                    <input type="checkbox" checked={hasVariants} onChange={(e) => setHasVariants(e.target.checked)} className="sr-only" />
-                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${hasVariants ? 'translate-x-4.5' : 'translate-x-[2px]'}`} />
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-bold text-gray-800">This product has multiple options</span>
-                                    <span className="text-xs text-gray-500">Like different sizes, colors, or materials.</span>
-                                </div>
-                            </label>
-                        </div>
-
-                        {!hasVariants && (
-                            <>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">SKU (Stock Keeping Unit) *</label>
-                                    <input type="text" value={form.sku} onChange={(e) => handleFieldChange("sku", e.target.value)} placeholder="e.g. AHI-RNG-001"
-                                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all font-mono" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Initial Stock Quantity *</label>
-                                    <input type="number" value={form.stock} onChange={(e) => handleFieldChange("stock", e.target.value)} min="0" placeholder="0"
-                                        className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                                </div>
-                            </>
-                        )}
-
-                        <div className="flex items-center pt-6">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={form.isFeatured} onChange={(e) => handleFieldChange("isFeatured", e.target.checked)}
-                                    className="h-4 w-4 rounded border-gray-300 text-brand-gold-500 focus:ring-brand-gold-400/30" />
-                                <span className="text-sm text-gray-700 font-medium flex items-center gap-1.5">
-                                    <Star className="h-4 w-4 text-amber-500 fill-amber-500" /> Mark as Featured
-                                </span>
-                            </label>
-                        </div>
+                {/* Sidebar Navigation */}
+                <div className="w-full md:w-56 flex-shrink-0">
+                    <div className="sticky top-6 flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
+                        {sectionTabs.map((tab) => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveSection(tab.id)}
+                                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+                                    activeSection === tab.id
+                                        ? "bg-white shadow-sm border border-gray-200/60 ring-1 ring-brand-gold-400/30 text-gray-900"
+                                        : "text-gray-500 hover:bg-white/60 hover:text-gray-700"
+                                }`}
+                            >
+                                <span className={activeSection === tab.id ? "text-brand-gold-500" : "text-gray-400"}>{tab.icon}</span>
+                                {tab.label}
+                            </button>
+                        ))}
                     </div>
-                </section>
+                </div>
 
-                {/* Weight & Dimensions */}
-                <section className="space-y-4 pt-4">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 border-b border-gray-100 pb-2 flex items-center gap-2">
-                        <Weight className="h-3.5 w-3.5" /> Weight & Dimensions <span className="text-[10px] font-normal normal-case text-gray-400">(Optional)</span>
-                    </h3>
+                {/* Content Area */}
+                <div className="flex-1 min-w-0">
+                    <div className="glass-card p-6 md:p-8 space-y-6">
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Weight ({weightUnit})</label>
-                            <input type="number" value={form.weight} onChange={(e) => handleFieldChange("weight", e.target.value)} min="0" step="any" placeholder="0"
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Length ({dimensionUnit})</label>
-                            <input type="number" value={form.length} onChange={(e) => handleFieldChange("length", e.target.value)} min="0" step="any" placeholder="0"
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Width ({dimensionUnit})</label>
-                            <input type="number" value={form.width} onChange={(e) => handleFieldChange("width", e.target.value)} min="0" step="any" placeholder="0"
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Height ({dimensionUnit})</label>
-                            <input type="number" value={form.height} onChange={(e) => handleFieldChange("height", e.target.value)} min="0" step="any" placeholder="0"
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                        </div>
-                    </div>
-                    <p className="text-[11px] text-gray-400 ml-1">Units are configured in Settings &rarr; Units & Order Format.</p>
-                </section>
+                        {/* ═══════ BASIC INFO ═══════ */}
+                        {activeSection === "basic" && (
+                            <section className="space-y-4">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 border-b border-gray-100 pb-2 flex items-center gap-2">
+                                    <Info className="h-3.5 w-3.5" /> Basic Information
+                                </h3>
 
-                {/* SEO Metadata */}
-                <section className="space-y-4 pt-4">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 border-b border-gray-100 pb-2 flex items-center gap-2">
-                        <Globe className="h-3.5 w-3.5" /> SEO Metadata <span className="text-[10px] font-normal normal-case text-gray-400">(Optional)</span>
-                    </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
+                                        <input type="text" value={form.title} onChange={(e) => handleFieldChange("title", e.target.value)} placeholder="e.g. Diamond Solitaire Ring"
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                    </div>
 
-                    <div className="grid grid-cols-1 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
-                            <input type="text" value={form.metaTitle} onChange={(e) => handleFieldChange("metaTitle", e.target.value)} placeholder="e.g. Diamond Solitaire Ring - Ahi Jewellery"
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
-                            <textarea rows={2} value={form.metaDescription} onChange={(e) => handleFieldChange("metaDescription", e.target.value)} placeholder="Brief description for search engines (up to 160 characters)"
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none resize-none transition-all" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Meta Keywords</label>
-                            <input type="text" value={form.metaKeywords} onChange={(e) => handleFieldChange("metaKeywords", e.target.value)} placeholder="e.g. diamond ring, 18k gold (comma separated)"
-                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                        </div>
-                    </div>
-                </section>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹) *</label>
+                                        <input type="number" value={form.price} onChange={(e) => handleFieldChange("price", e.target.value)} min="0" step="1"
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                    </div>
 
-                {/* Images */}
-                <section className="space-y-4 pt-4">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 border-b border-gray-100 pb-2 flex items-center justify-between">
-                        <span>Product Images</span>
-                        <span className="text-[10px] font-normal normal-case text-gray-400">Max 5 images</span>
-                    </h3>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+                                        <input type="text" value={form.brand} onChange={(e) => handleFieldChange("brand", e.target.value)} placeholder="e.g. Ahi"
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                    </div>
 
-                    {/* Existing Images */}
-                    {existingImages.length > 0 && (
-                        <div className="space-y-2">
-                            <p className="text-[10px] text-gray-400">Drag images to reorder them on the storefront.</p>
-                            <Reorder.Group axis="x" values={existingImages} onReorder={setExistingImages} className="flex gap-3 flex-wrap">
-                                {existingImages.map((img) => (
-                                    <Reorder.Item key={img.id} value={img} className="relative h-24 w-24 rounded-xl overflow-hidden border border-gray-200 group shadow-sm cursor-grab active:cursor-grabbing">
-                                        <img src={img.url} alt="" className="h-full w-full object-cover pointer-events-none select-none" draggable={false} />
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <button onClick={(e) => { e.stopPropagation(); removeExistingImage(img.id); }}
-                                                className="h-8 w-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors transform scale-90 group-hover:scale-100 cursor-pointer">
-                                                <Trash2 className="h-4 w-4" />
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                                        <select value={form.categoryId} onChange={(e) => handleFieldChange("categoryId", e.target.value)}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none bg-white transition-all cursor-pointer">
+                                            <option value="">Select category</option>
+                                            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div className="flex items-end pb-1">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" checked={form.isFeatured} onChange={(e) => handleFieldChange("isFeatured", e.target.checked)}
+                                                className="h-4 w-4 rounded border-gray-300 text-brand-gold-500 focus:ring-brand-gold-400/30" />
+                                            <span className="text-sm text-gray-700 font-medium flex items-center gap-1.5">
+                                                <Star className="h-4 w-4 text-amber-500 fill-amber-500" /> Mark as Featured
+                                            </span>
+                                        </label>
+                                    </div>
+
+                                    <div className="md:col-span-2 pt-2 pb-2">
+                                        <label className="flex items-center gap-3 cursor-pointer p-4 bg-brand-gold-50/50 rounded-xl border border-brand-gold-100">
+                                            <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${hasVariants ? 'bg-brand-gold-500' : 'bg-gray-300'}`}>
+                                                <input type="checkbox" checked={hasVariants} onChange={(e) => setHasVariants(e.target.checked)} className="sr-only" />
+                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${hasVariants ? 'translate-x-4.5' : 'translate-x-[2px]'}`} />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-gray-800">This product has multiple options</span>
+                                                <span className="text-xs text-gray-500">Like different sizes, colors, or materials.</span>
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    {!hasVariants && (
+                                        <>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">SKU (Stock Keeping Unit) *</label>
+                                                <input type="text" value={form.sku} onChange={(e) => handleFieldChange("sku", e.target.value)} placeholder="e.g. AHI-RNG-001"
+                                                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all font-mono" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Initial Stock Quantity *</label>
+                                                <input type="number" value={form.stock} onChange={(e) => handleFieldChange("stock", e.target.value)} min="0" placeholder="0"
+                                                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Variants Section (inline when enabled) */}
+                                {hasVariants && (
+                                    <div className="pt-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-500">Product Variants</h4>
+                                            <button onClick={addVariant} type="button" className="text-xs font-semibold text-brand-gold-600 hover:text-brand-gold-700 transition-colors flex items-center gap-1 bg-brand-gold-50 px-3 py-1.5 rounded-lg">
+                                                <Plus className="h-3.5 w-3.5" /> Add Variant
                                             </button>
                                         </div>
-                                    </Reorder.Item>
-                                ))}
-                            </Reorder.Group>
-                        </div>
-                    )}
-
-                    {/* New File Previews */}
-                    {newFiles.length > 0 && (
-                        <div className="flex gap-3 flex-wrap pt-2">
-                            {newFiles.map((file, i) => (
-                                <div key={i} className="relative h-24 w-24 rounded-xl overflow-hidden border-2 border-brand-gold-200 bg-brand-gold-50/30 group">
-                                    <img src={URL.createObjectURL(file)} alt="" className="h-full w-full object-cover opacity-90" />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <button onClick={() => removeNewFile(i)}
-                                            className="h-8 w-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors transform scale-90 group-hover:scale-100">
-                                            <X className="h-4 w-4" />
-                                        </button>
+                                        <div className="space-y-3">
+                                            {variants.map((v, i) => (
+                                                <div key={i} className="flex flex-col md:flex-row gap-3 bg-gray-50/50 p-4 rounded-xl border border-gray-100 relative group">
+                                                    {variants.length > 1 && (
+                                                        <button onClick={() => removeVariant(i)} className="absolute -right-2 -top-2 bg-white border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 h-6 w-6 rounded-full flex items-center justify-center shadow-sm transition-colors opacity-0 group-hover:opacity-100">
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    )}
+                                                    <div className="flex-1">
+                                                        <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Option Name</label>
+                                                        <input placeholder="e.g. Size" value={v.name} onChange={(e) => handleVariantChange(i, "name", e.target.value)}
+                                                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Option Value</label>
+                                                        <input placeholder="e.g. 18K" value={v.value} onChange={(e) => handleVariantChange(i, "value", e.target.value)}
+                                                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">SKU</label>
+                                                        <input placeholder="e.g. RING-18K-001" value={v.sku} onChange={(e) => handleVariantChange(i, "sku", e.target.value)}
+                                                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all font-mono" />
+                                                    </div>
+                                                    <div className="w-full md:w-24">
+                                                        <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Stock Qty</label>
+                                                        <input type="number" placeholder="0" value={v.stock} onChange={(e) => handleVariantChange(i, "stock", e.target.value)} min="0"
+                                                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className="absolute bottom-1 left-1 bg-black/60 text-white text-[8px] px-1.5 py-0.5 rounded truncate max-w-[80px]">
-                                        New
+                                )}
+                            </section>
+                        )}
+
+                        {/* ═══════ DESCRIPTION (Rich Text) ═══════ */}
+                        {activeSection === "description" && (
+                            <section className="space-y-4">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 border-b border-gray-100 pb-2 flex items-center gap-2">
+                                    <FileText className="h-3.5 w-3.5" /> Product Description
+                                </h3>
+                                <p className="text-xs text-gray-400">Use the editor toolbar to format text with bold, italic, lists, headings and more. This content appears in the "Description" section on the storefront.</p>
+                                <TipTapEditor
+                                    value={form.description}
+                                    onChange={(val) => handleFieldChange("description", val)}
+                                />
+                            </section>
+                        )}
+
+                        {/* ═══════ PRODUCT DETAILS ═══════ */}
+                        {activeSection === "details" && (
+                            <section className="space-y-6">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 border-b border-gray-100 pb-2 flex items-center gap-2">
+                                    <Weight className="h-3.5 w-3.5" /> Product Details
+                                </h3>
+                                <p className="text-xs text-gray-400">These details appear in the "Product Details" section on the storefront product page.</p>
+
+                                {/* Material & Features */}
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Material</label>
+                                        <input type="text" value={form.material} onChange={(e) => handleFieldChange("material", e.target.value)} placeholder="e.g. Brass Alloy, Zirconia, Pearls (No Plastic), 18kt Gold Plating"
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                        <p className="text-[11px] text-gray-400 mt-1">Full material composition of the product</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Features</label>
+                                        <input type="text" value={form.features} onChange={(e) => handleFieldChange("features", e.target.value)} placeholder="e.g. Hypoallergenic, Anti-tarnish"
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                        <p className="text-[11px] text-gray-400 mt-1">Comma-separated product features</p>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    )}
 
-                    {/* Drop Zone */}
-                    <div
-                        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-                        onDragLeave={() => setDragActive(false)}
-                        onDrop={handleFileDrop}
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all duration-200 ${dragActive ? "border-brand-gold-400 bg-brand-gold-50/50 scale-[0.99]" : "border-gray-300 hover:border-brand-gold-300 hover:bg-gray-50 bg-gray-50/50"}`}
-                    >
-                        <div className="h-12 w-12 rounded-full bg-white shadow-sm flex items-center justify-center mx-auto mb-3 border border-gray-100">
-                            <Upload className="h-5 w-5 text-brand-gold-500" />
-                        </div>
-                        <p className="text-sm text-gray-600 font-medium">Drag & drop product images here</p>
-                        <p className="text-xs text-gray-400 mt-1">or <span className="text-brand-gold-500 hover:underline">click to browse from your computer</span></p>
-                        <p className="text-[10px] text-gray-400 mt-2 font-mono">JPG, PNG up to 5MB</p>
+                                {/* Weight & Dimensions */}
+                                <div className="pt-2">
+                                    <h4 className="text-xs font-semibold text-gray-500 mb-3">Weight & Dimensions</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Weight ({weightUnit})</label>
+                                            <input type="number" value={form.weight} onChange={(e) => handleFieldChange("weight", e.target.value)} min="0" step="any" placeholder="0"
+                                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Length ({dimensionUnit})</label>
+                                            <input type="number" value={form.length} onChange={(e) => handleFieldChange("length", e.target.value)} min="0" step="any" placeholder="0"
+                                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Width ({dimensionUnit})</label>
+                                            <input type="number" value={form.width} onChange={(e) => handleFieldChange("width", e.target.value)} min="0" step="any" placeholder="0"
+                                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Height ({dimensionUnit})</label>
+                                            <input type="number" value={form.height} onChange={(e) => handleFieldChange("height", e.target.value)} min="0" step="any" placeholder="0"
+                                                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                        </div>
+                                    </div>
+                                    <p className="text-[11px] text-gray-400 ml-1 mt-2">Units are configured in Settings &rarr; Units & Order Format.</p>
+                                </div>
+                            </section>
+                        )}
+
+                        {/* ═══════ JEWELLERY CARE ═══════ */}
+                        {activeSection === "care" && (
+                            <section className="space-y-4">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 border-b border-gray-100 pb-2 flex items-center gap-2">
+                                    <Diamond className="h-3.5 w-3.5" /> Jewellery Care
+                                </h3>
+                                <p className="text-xs text-gray-400">Care instructions specific to this product. Appears in the "Jewellery Care" section on the storefront. If left empty, global store policy from Settings will be used.</p>
+                                <TipTapEditor
+                                    value={form.careInstructions}
+                                    onChange={(val) => handleFieldChange("careInstructions", val)}
+                                />
+                            </section>
+                        )}
+
+                        {/* ═══════ SHIPPING INFO ═══════ */}
+                        {activeSection === "shipping" && (
+                            <section className="space-y-4">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 border-b border-gray-100 pb-2 flex items-center gap-2">
+                                    <Truck className="h-3.5 w-3.5" /> Shipping Information
+                                </h3>
+                                <p className="text-xs text-gray-400">Shipping details specific to this product. Appears in the "Shipping Info" section on the storefront. If left empty, global store policy from Settings will be used.</p>
+                                <TipTapEditor
+                                    value={form.shippingInfo}
+                                    onChange={(val) => handleFieldChange("shippingInfo", val)}
+                                />
+                            </section>
+                        )}
+
+                        {/* ═══════ RETURN & EXCHANGE ═══════ */}
+                        {activeSection === "return" && (
+                            <section className="space-y-4">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 border-b border-gray-100 pb-2 flex items-center gap-2">
+                                    <RefreshCw className="h-3.5 w-3.5" /> Return & Exchange Policy
+                                </h3>
+                                <p className="text-xs text-gray-400">Return and exchange policy specific to this product. Appears in the "Return and Exchange" section on the storefront. If left empty, global store policy from Settings will be used.</p>
+                                <TipTapEditor
+                                    value={form.returnPolicy}
+                                    onChange={(val) => handleFieldChange("returnPolicy", val)}
+                                />
+                            </section>
+                        )}
+
+                        {/* ═══════ IMAGES ═══════ */}
+                        {activeSection === "images" && (
+                            <section className="space-y-4">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 border-b border-gray-100 pb-2 flex items-center justify-between">
+                                    <span className="flex items-center gap-2"><Upload className="h-3.5 w-3.5" /> Product Images</span>
+                                    <span className="text-[10px] font-normal normal-case text-gray-400">Max 5 images</span>
+                                </h3>
+
+                                {existingImages.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] text-gray-400">Drag images to reorder them on the storefront.</p>
+                                        <Reorder.Group axis="x" values={existingImages} onReorder={setExistingImages} className="flex gap-3 flex-wrap">
+                                            {existingImages.map((img) => (
+                                                <Reorder.Item key={img.id} value={img} className="relative h-24 w-24 rounded-xl overflow-hidden border border-gray-200 group shadow-sm cursor-grab active:cursor-grabbing">
+                                                    <img src={img.url} alt="" className="h-full w-full object-cover pointer-events-none select-none" draggable={false} />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <button onClick={(e) => { e.stopPropagation(); removeExistingImage(img.id); }}
+                                                            className="h-8 w-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors transform scale-90 group-hover:scale-100 cursor-pointer">
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                </Reorder.Item>
+                                            ))}
+                                        </Reorder.Group>
+                                    </div>
+                                )}
+
+                                {newFiles.length > 0 && (
+                                    <div className="flex gap-3 flex-wrap pt-2">
+                                        {newFiles.map((file, i) => (
+                                            <div key={i} className="relative h-24 w-24 rounded-xl overflow-hidden border-2 border-brand-gold-200 bg-brand-gold-50/30 group">
+                                                <img src={URL.createObjectURL(file)} alt="" className="h-full w-full object-cover opacity-90" />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <button onClick={() => removeNewFile(i)}
+                                                        className="h-8 w-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors transform scale-90 group-hover:scale-100">
+                                                        <X className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                                <div className="absolute bottom-1 left-1 bg-black/60 text-white text-[8px] px-1.5 py-0.5 rounded truncate max-w-[80px]">
+                                                    New
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div
+                                    onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                                    onDragLeave={() => setDragActive(false)}
+                                    onDrop={handleFileDrop}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className={`rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all duration-200 ${dragActive ? "border-brand-gold-400 bg-brand-gold-50/50 scale-[0.99]" : "border-gray-300 hover:border-brand-gold-300 hover:bg-gray-50 bg-gray-50/50"}`}
+                                >
+                                    <div className="h-12 w-12 rounded-full bg-white shadow-sm flex items-center justify-center mx-auto mb-3 border border-gray-100">
+                                        <Upload className="h-5 w-5 text-brand-gold-500" />
+                                    </div>
+                                    <p className="text-sm text-gray-600 font-medium">Drag & drop product images here</p>
+                                    <p className="text-xs text-gray-400 mt-1">or <span className="text-brand-gold-500 hover:underline">click to browse from your computer</span></p>
+                                    <p className="text-[10px] text-gray-400 mt-2 font-mono">JPG, PNG up to 5MB</p>
+                                </div>
+                                <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
+                            </section>
+                        )}
+
+                        {/* ═══════ SEO ═══════ */}
+                        {activeSection === "seo" && (
+                            <section className="space-y-4">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 border-b border-gray-100 pb-2 flex items-center gap-2">
+                                    <Globe className="h-3.5 w-3.5" /> SEO Metadata <span className="text-[10px] font-normal normal-case text-gray-400">(Optional)</span>
+                                </h3>
+
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
+                                        <input type="text" value={form.metaTitle} onChange={(e) => handleFieldChange("metaTitle", e.target.value)} placeholder="e.g. Diamond Solitaire Ring - Ahi Jewellery"
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
+                                        <textarea rows={2} value={form.metaDescription} onChange={(e) => handleFieldChange("metaDescription", e.target.value)} placeholder="Brief description for search engines (up to 160 characters)"
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none resize-none transition-all" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Meta Keywords</label>
+                                        <input type="text" value={form.metaKeywords} onChange={(e) => handleFieldChange("metaKeywords", e.target.value)} placeholder="e.g. diamond ring, 18k gold (comma separated)"
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
+                        {/* Global Error */}
+                        {error && (
+                            <div className="rounded-xl bg-red-50 p-4 border border-red-100 flex items-start gap-3">
+                                <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                                <p className="text-sm text-red-600 font-medium">{error}</p>
+                            </div>
+                        )}
                     </div>
-                    <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
-                </section>
-
-                {/* Variants Section */}
-                {hasVariants && (
-                    <section className="space-y-4 pt-4">
-                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">Product Variants</h3>
-                        </div>
-                                <div className="flex justify-end mb-2">
-                                    <button onClick={addVariant} type="button" className="text-xs font-semibold text-brand-gold-600 hover:text-brand-gold-700 transition-colors flex items-center gap-1 bg-brand-gold-50 px-3 py-1.5 rounded-lg">
-                                        <Plus className="h-3.5 w-3.5" /> Add Variant
-                                    </button>
-                                </div>
-                                <div className="space-y-3">
-                            {variants.map((v, i) => (
-                                <div key={i} className="flex flex-col md:flex-row gap-3 bg-gray-50/50 p-4 rounded-xl border border-gray-100 relative group">
-
-                                    {variants.length > 1 && (
-                                        <button onClick={() => removeVariant(i)} className="absolute -right-2 -top-2 bg-white border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 h-6 w-6 rounded-full flex items-center justify-center shadow-sm transition-colors opacity-0 group-hover:opacity-100">
-                                            <X className="h-3 w-3" />
-                                        </button>
-                                    )}
-
-                                    <div className="flex-1">
-                                        <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Option Name</label>
-                                        <input placeholder="e.g. Size" value={v.name} onChange={(e) => handleVariantChange(i, "name", e.target.value)}
-                                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Option Value</label>
-                                        <input placeholder="e.g. 18K" value={v.value} onChange={(e) => handleVariantChange(i, "value", e.target.value)}
-                                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">SKU</label>
-                                        <input placeholder="e.g. RING-18K-001" value={v.sku} onChange={(e) => handleVariantChange(i, "sku", e.target.value)}
-                                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all font-mono" />
-                                    </div>
-                                    <div className="w-full md:w-24">
-                                        <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Stock Qty</label>
-                                        <input type="number" placeholder="0" value={v.stock} onChange={(e) => handleVariantChange(i, "stock", e.target.value)} min="0"
-                                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-gold-400 focus:ring-1 focus:ring-brand-gold-400/20 focus:outline-none transition-all" />
-                                    </div>
-                                </div>
-                            ))}
-                                </div>
-                    </section>
-                )}
-
-                {/* Global Error */}
-                {error && (
-                    <div className="rounded-xl bg-red-50 p-4 border border-red-100 flex items-start gap-3">
-                        <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
-                        <p className="text-sm text-red-600 font-medium">{error}</p>
-                    </div>
-                )}
+                </div>
             </div>
 
             {/* Floating Action Bar */}
             <div className="fixed bottom-0 left-[260px] right-0 bg-white/80 backdrop-blur-md border-t border-gray-200 p-4 z-40 transform transition-transform">
-                <div className="max-w-4xl mx-auto flex items-center justify-end gap-3">
+                <div className="max-w-5xl mx-auto flex items-center justify-end gap-3">
                     <button onClick={() => navigate("/products")} className="btn-outline px-6 text-sm">Cancel</button>
                     <button onClick={handleSave} disabled={saving || !form.title || !form.price || !form.categoryId || (!hasVariants && !form.sku)}
                         className="btn-primary px-8 text-sm disabled:opacity-50 flex items-center gap-2">
