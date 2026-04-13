@@ -58,6 +58,9 @@ interface Order {
     appliedCouponId?: string;
     items?: OrderItem[];
     payment?: OrderPayment;
+    awbNumber?: string | null;
+    courierName?: string | null;
+    trackingStatus?: string | null;
     createdAt: string;
 }
 
