@@ -322,6 +322,51 @@ function OrderDetailDrawer({
                                         </button>
                                     </div>
                                 </div>
+                                {/* Shipment & Tracking */}
+                                <div className="glass-card p-4">
+                                    <div className="flex items-center gap-2 mb-3 text-gray-400">
+                                        <Package className="h-3.5 w-3.5" />
+                                        <span className="text-[10px] font-bold uppercase tracking-widest">Shipment & Tracking</span>
+                                    </div>
+                                    {data.awbNumber ? (
+                                         <div className="space-y-2 text-xs">
+                                             <div className="flex justify-between items-center bg-gray-50 p-2 rounded border border-gray-100">
+                                                 <span className="text-gray-500 font-semibold">Tracking Number</span>
+                                                 <span className="font-mono text-indigo-600 font-bold tracking-wide">{data.awbNumber}</span>
+                                             </div>
+                                             <div className="flex justify-between">
+                                                <span className="text-gray-400">Courier</span>
+                                                <span className="text-gray-700 font-medium">{data.courierName || "Xpressbees"}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-400">Live Status</span>
+                                                <span className="text-gray-900 font-bold capitalize">{data.trackingStatus || "In Transit"}</span>
+                                            </div>
+                                         </div>
+                                    ) : (
+                                         <div className="text-center py-2">
+                                             <button
+                                                 onClick={async () => {
+                                                     try {
+                                                         setUpdatingStatus(true);
+                                                         const res = await api.post(`/shipment/${data.id}/create`);
+                                                         setFullOrder(res.data.data);
+                                                     } catch (err: any) {
+                                                         alert(err.response?.data?.message || err.message);
+                                                     } finally {
+                                                         setUpdatingStatus(false);
+                                                     }
+                                                 }}
+                                                 disabled={updatingStatus || data.status === 'CANCELLED'}
+                                                 className="btn-outline w-full text-xs font-semibold uppercase tracking-wider text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                             >
+                                                 {updatingStatus ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : "Generate Xpressbees Shipment"}
+                                             </button>
+                                             <p className="text-[10px] text-gray-400 mt-2">Creates a live AWB and updates the order status natively.</p>
+                                         </div>
+                                    )}
+                                </div>
+
                             </div>
                         )}
 
