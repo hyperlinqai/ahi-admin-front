@@ -3,7 +3,7 @@ FROM node:20.19.0-alpine AS builder
 WORKDIR /app
 
 # Enable corepack and install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@8 --activate
 
 # Install dependencies first (for better caching)
 COPY package.json pnpm-lock.yaml ./
