@@ -19,6 +19,7 @@ ENV VITE_API_URL=$VITE_API_URL
 # Build the Vite React application
 RUN pnpm build
 
+# 
 # Production Stage - Nginx
 FROM nginx:alpine AS production
 
