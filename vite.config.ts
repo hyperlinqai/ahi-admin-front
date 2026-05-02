@@ -8,6 +8,10 @@ export default defineConfig({
   server: {
     port: 3001
   },
+  preview: {
+    host: true,
+    allowedHosts: ['.traefik.me', 'admin.ahijewellery.com']
+  },
   build: {
     rollupOptions: {
       input: {
