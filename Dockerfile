@@ -13,8 +13,8 @@ RUN pnpm i --frozen-lockfile
 COPY . .
 
 # Accept build-time environment variables
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
+# ARG VITE_API_URL
+# ENV VITE_API_URL=$VITE_API_URL
 
 # Build the Vite React application
 RUN pnpm build
