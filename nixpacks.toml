@@ -1,5 +1,11 @@
-[phases.setup]
-nixPkgs = ["nodejs_20"]
-
 [variables]
-NODE_VERSION = "20.19.0"
+NIXPACKS_NODE_VERSION = "20"
+
+[phases.install]
+cmds = ["pnpm install --frozen-lockfile"]
+
+[phases.build]
+cmds = ["NODE_ENV=production pnpm run build"]
+
+[start]
+cmd = "sh -c 'NODE_ENV=production pnpm exec vite preview --host 0.0.0.0 --port ${PORT:-3000}'"
