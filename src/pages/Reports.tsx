@@ -1,14 +1,15 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { BarChart3, TrendingUp, Users, Package, RotateCcw } from "lucide-react";
+import { BarChart3, TrendingUp, Users, Package, RotateCcw, ShoppingBag } from "lucide-react";
 
 // We will build these out in subsequent steps
 import SalesTab from "../components/Reports/SalesTab";
 import InventoryTab from "../components/Reports/InventoryTab";
 import CustomersTab from "../components/Reports/CustomersTab";
 import ReturnsTab from "../components/Reports/ReturnsTab";
+import AbandonedCheckoutsTab from "../components/Reports/AbandonedCheckoutsTab";
 
-type TabType = "sales" | "inventory" | "customers" | "returns";
+type TabType = "sales" | "inventory" | "customers" | "returns" | "abandoned";
 
 export default function Reports() {
     const [activeTab, setActiveTab] = useState<TabType>("sales");
@@ -18,6 +19,7 @@ export default function Reports() {
         { id: "inventory", label: "Inventory Analysis", icon: <Package className="h-4 w-4" /> },
         { id: "customers", label: "Customer Insights", icon: <Users className="h-4 w-4" /> },
         { id: "returns", label: "Returns Processing", icon: <RotateCcw className="h-4 w-4" /> },
+        { id: "abandoned", label: "Abandoned Checkouts", icon: <ShoppingBag className="h-4 w-4" /> },
     ];
 
     return (
@@ -69,6 +71,7 @@ export default function Reports() {
                 {activeTab === "inventory" && <InventoryTab />}
                 {activeTab === "customers" && <CustomersTab />}
                 {activeTab === "returns" && <ReturnsTab />}
+                {activeTab === "abandoned" && <AbandonedCheckoutsTab />}
             </div>
         </motion.div>
     );

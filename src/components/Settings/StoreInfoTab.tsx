@@ -16,6 +16,7 @@ export default function StoreInfoTab({ data, onSave, isSaving }: StoreInfoTabPro
         address: "",
         logoUrl: "",
     });
+    const [isUploading, setIsUploading] = useState(false);
 
     useEffect(() => {
         if (data && data.store) {
@@ -35,15 +36,20 @@ export default function StoreInfoTab({ data, onSave, isSaving }: StoreInfoTabPro
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleLogoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            // For now, simulate a logo URL until an actual upload endpoint is wired correctly if it doesn't already exist.
-            // Using a generic URL placeholder strategy for demonstration.
-            const fakePath = URL.createObjectURL(file);
-            setFormData(prev => ({ ...prev, logoUrl: fakePath }));
-            
-            // Note: In reality, you'd upload this file to S3/Cloudinary via an upload endpoint and insert the returned URL here.
+        if (!file) return;
+
+        try {
+            setIsUploading(true);
+            const res = await settingsApi.uploadLogo(file);
+            if (res.success && res.url) {
+                setFormData(prev => ({ ...prev, logoUrl: res.url }));
+            }
+        } catch (error) {
+            console.error("Logo upload failed:", error);
+        } finally {
+            setIsUploading(false);
         }
     };
 
@@ -83,10 +89,10 @@ export default function StoreInfoTab({ data, onSave, isSaving }: StoreInfoTabPro
                             )}
                         </div>
                         <div className="flex-1">
-                            <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors">
-                                <Upload className="w-4 h-4" />
-                                Upload new image
-                                <input type="file" accept="image/*" className="hidden" onChange={handleLogoSelect} />
+                            <label className={`inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors ${isUploading ? "opacity-50 cursor-not-allowed" : ""}`}>
+                                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                {isUploading ? "Uploading..." : "Upload new image"}
+                                <input type="file" accept="image/*" className="hidden" onChange={handleLogoSelect} disabled={isUploading} />
                             </label>
                             <p className="text-xs text-gray-400 mt-2">
                                 Recommended: 512x512px SVG, PNG, or JPG. Max 2MB.
