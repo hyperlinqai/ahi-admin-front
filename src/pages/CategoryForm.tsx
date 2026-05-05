@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import api from "../api/axios";
 import { X, Upload, ChevronLeft, Loader2, Check, AlertTriangle, Trash2 } from "lucide-react";
 import imageCompression from "browser-image-compression";
+import { useNotificationStore } from "../store/notificationStore";
 
 // ─── Types ───────────────────────────────────────────────────
 interface Category {
@@ -23,6 +24,7 @@ export default function CategoryForm() {
     const navigate = useNavigate();
     const isEdit = Boolean(id && id !== "new");
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { addNotification } = useNotificationStore();
 
     const [allCategories, setAllCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(isEdit);
@@ -155,15 +157,31 @@ export default function CategoryForm() {
                 await api.put(`/categories/${id}`, formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
+                addNotification({
+                    title: "Category Updated",
+                    message: `Changes to ${form.name} have been saved`,
+                    type: "success",
+                });
             } else {
                 await api.post("/categories", formData, {
                     headers: { "Content-Type": "multipart/form-data" },
+                });
+                addNotification({
+                    title: "Category Created",
+                    message: `${form.name} has been successfully added`,
+                    type: "success",
                 });
             }
 
             navigate("/categories");
         } catch (err: any) {
-            setError(err?.response?.data?.message || "Failed to save category");
+            const errorMsg = err?.response?.data?.message || "Failed to save category";
+            setError(errorMsg);
+            addNotification({
+                title: "Save Failed",
+                message: errorMsg,
+                type: "error",
+            });
         } finally {
             setSaving(false);
         }

@@ -21,7 +21,7 @@ import {
     ThumbsUp,
     ThumbsDown,
 } from "lucide-react";
-import toast from "react-hot-toast";
+import { useNotificationStore } from "../store/notificationStore";
 import {
     getReturns,
     getReturnById,
@@ -188,7 +188,10 @@ function RejectModal({
     const [submitting, setSubmitting] = useState(false);
 
     const handleConfirm = async () => {
-        if (!note.trim()) { toast.error("Admin note is required"); return; }
+        if (!note.trim()) { 
+            addNotification({ title: "Input Required", message: "Admin note is required", type: "warning" });
+            return; 
+        }
         setSubmitting(true);
         try { await onConfirm(note.trim()); onClose(); }
         catch { /* handled */ }
@@ -254,6 +257,7 @@ function ReturnDetailDrawer({
 }) {
     const [ret, setRet] = useState<ReturnDetail | null>(null);
     const [loading, setLoading] = useState(true);
+    const { addNotification } = useNotificationStore();
     const [acting, setActing] = useState<"approve" | "refund" | null>(null);
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [lightboxImg, setLightboxImg] = useState<string | null>(null);
@@ -267,7 +271,7 @@ function ReturnDetailDrawer({
         setLoading(true);
         getReturnById(returnId)
             .then(setRet)
-            .catch(() => toast.error("Failed to load return details"))
+            .catch(() => addNotification({ title: "Load Failed", message: "Failed to load return details", type: "error" }))
             .finally(() => setLoading(false));
     }, [returnId]);
 
@@ -278,9 +282,9 @@ function ReturnDetailDrawer({
             await approveReturn(ret.id);
             setRet((r) => r ? { ...r, status: "APPROVED" } : r);
             onStatusChange(ret.id, "APPROVED");
-            toast.success("Return approved");
+            addNotification({ title: "Return Approved", message: `Request for ${ret.order.orderNumber} approved`, type: "success" });
         } catch {
-            toast.error("Failed to approve return");
+            addNotification({ title: "Approval Failed", message: "Could not approve return", type: "error" });
         } finally {
             setActing(null);
         }
@@ -292,9 +296,9 @@ function ReturnDetailDrawer({
             await rejectReturn(ret.id, note);
             setRet((r) => r ? { ...r, status: "REJECTED", adminNote: note } : r);
             onStatusChange(ret.id, "REJECTED");
-            toast.success("Return rejected");
+            addNotification({ title: "Return Rejected", message: `Request for ${ret.order.orderNumber} rejected`, type: "success" });
         } catch {
-            toast.error("Failed to reject return");
+            addNotification({ title: "Rejection Failed", message: "Could not reject return", type: "error" });
             throw new Error();
         }
     };
@@ -304,12 +308,12 @@ function ReturnDetailDrawer({
         setActing("refund");
         try {
             await initiateRefund(ret.orderId, ret.order.total);
-            toast.success("Refund initiated successfully");
+            addNotification({ title: "Refund Initiated", message: `Refund of ${INR(ret.order.total)} processed`, type: "success" });
             // Reload to get updated refunds
             const updated = await getReturnById(returnId);
             setRet(updated);
         } catch {
-            toast.error("Refund failed — check Razorpay payment details");
+            addNotification({ title: "Refund Failed", message: "Check Razorpay payment details", type: "error" });
         } finally {
             setActing(null);
         }

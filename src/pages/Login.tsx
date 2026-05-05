@@ -7,8 +7,8 @@ import { AxiosError } from "axios";
 import { AuthResponse } from "../types";
 
 export default function Login() {
-    const [email, setEmail] = useState("admin@ahijewellery.com");
-    const [password, setPassword] = useState("admin123456");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -168,7 +168,7 @@ export default function Login() {
                                 </label>
                             </div>
                             <Link
-                                to="#"
+                                to="/forgot-password"
                                 className="text-xs font-semibold text-[#c49a3c] hover:text-[#a17f2e] transition-colors"
                             >
                                 Forgot password?

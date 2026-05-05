@@ -30,10 +30,10 @@ api.interceptors.request.use((config) => {
     }
 
     if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-        console.log("✅ Authorization header set (first 30 chars):", token.substring(0, 30) + "...");
+        config.headers["Authorization"] = `Bearer ${token}`;
+        console.log(`✅ Authorization header set for ${config.method?.toUpperCase()} ${config.url}`);
     } else {
-        console.warn("⚠️ No token available - request will be unauthenticated");
+        console.warn(`⚠️ No token available for ${config.method?.toUpperCase()} ${config.url}`);
     }
     return config;
 });

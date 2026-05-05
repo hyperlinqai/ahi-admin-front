@@ -106,55 +106,19 @@ export default function Settings() {
             const res = await settingsApi.updateSettings(mergedSettings);
             setSettings(res.data);
 
-            // Step 1: Show prominent on-screen toast alert FIRST
-            toast.success(`${tabLabel} saved successfully`, {
-                duration: 4000,
-                style: {
-                    background: "#065f46",
-                    color: "#fff",
-                    fontWeight: 600,
-                    padding: "14px 20px",
-                    borderRadius: "12px",
-                    fontSize: "14px",
-                    boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
-                },
-                iconTheme: { primary: "#34d399", secondary: "#fff" },
+            addNotification({
+                title: `${tabLabel} updated`,
+                message: `${tabLabel} has been updated successfully.`,
+                type: "success",
             });
-
-            // Step 2: After toast is visible, add to bell icon notification
-            setTimeout(() => {
-                addNotification({
-                    title: "Settings Updated",
-                    message: `${tabLabel} has been updated successfully.`,
-                    type: "success",
-                });
-            }, 1500);
         } catch (error) {
             console.error(error);
 
-            // Step 1: Show prominent on-screen error alert FIRST
-            toast.error(`Failed to update ${tabLabel}`, {
-                duration: 5000,
-                style: {
-                    background: "#991b1b",
-                    color: "#fff",
-                    fontWeight: 600,
-                    padding: "14px 20px",
-                    borderRadius: "12px",
-                    fontSize: "14px",
-                    boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
-                },
-                iconTheme: { primary: "#fca5a5", secondary: "#fff" },
+            addNotification({
+                title: `Update failed`,
+                message: `Could not save ${tabLabel}. Please try again.`,
+                type: "error",
             });
-
-            // Step 2: After toast is visible, add to bell icon notification
-            setTimeout(() => {
-                addNotification({
-                    title: "Settings Update Failed",
-                    message: `Could not save ${tabLabel}. Please try again.`,
-                    type: "error",
-                });
-            }, 1500);
         } finally {
             setIsSaving(false);
         }

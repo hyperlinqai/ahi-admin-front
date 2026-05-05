@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../api/axios";
+import { useNotificationStore } from "../store/notificationStore";
 import {
     Search, Plus, Edit2, Trash2, Package, ChevronLeft, ChevronRight,
     Filter, Loader2, Image as ImageIcon, Star, AlertTriangle,
@@ -107,6 +108,8 @@ export default function Products() {
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
 
+    const { addNotification } = useNotificationStore();
+
     // Modals
     const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
 
@@ -161,8 +164,19 @@ export default function Products() {
         if (!deleteTarget) return;
         try {
             await api.delete(`/products/${deleteTarget.id}`);
+            addNotification({
+                title: "Product Deleted",
+                message: `${deleteTarget.title} has been removed`,
+                type: "success",
+            });
             fetchProducts(meta.page);
-        } catch { /* silent */ }
+        } catch (err: any) {
+            addNotification({
+                title: "Delete Failed",
+                message: err.response?.data?.message || "Could not delete product",
+                type: "error",
+            });
+        }
         setDeleteTarget(null);
     };
 

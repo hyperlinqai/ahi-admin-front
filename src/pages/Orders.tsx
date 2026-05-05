@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../api/axios";
+import { useNotificationStore } from "../store/notificationStore";
 import {
     Search,
     ChevronLeft,
@@ -131,6 +132,7 @@ function OrderDetailDrawer({
     const [loading, setLoading] = useState(false);
     const [updatingStatus, setUpdatingStatus] = useState(false);
     const [newStatus, setNewStatus] = useState("");
+    const { addNotification } = useNotificationStore();
 
     useEffect(() => {
         if (!order) return;
@@ -149,8 +151,17 @@ function OrderDetailDrawer({
             await api.patch(`/orders/${fullOrder.id}/status`, { status: newStatus });
             onStatusUpdate(fullOrder.id, newStatus);
             setFullOrder({ ...fullOrder, status: newStatus });
-        } catch {
-            // silent
+            addNotification({
+                title: "Status Updated",
+                message: `Order ${fullOrder.orderNumber} is now ${newStatus}`,
+                type: "success",
+            });
+        } catch (err: any) {
+            addNotification({
+                title: "Update Failed",
+                message: err.response?.data?.message || "Failed to update order status",
+                type: "error",
+            });
         } finally {
             setUpdatingStatus(false);
         }
@@ -353,9 +364,20 @@ function OrderDetailDrawer({
                                                      try {
                                                          setUpdatingStatus(true);
                                                          const res = await api.post(`/shipment/${data.id}/create`);
-                                                         setFullOrder(res.data.data);
+                                                         const updated = res.data.data;
+                                                         setFullOrder(updated);
+                                                         addNotification({
+                                                             title: "Shipment Generated",
+                                                             message: `AWB ${updated.awbNumber} created for Order ${data.orderNumber}`,
+                                                             type: "success",
+                                                         });
                                                      } catch (err: any) {
-                                                         alert(err.response?.data?.message || err.message);
+                                                         const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message;
+                                                         addNotification({
+                                                             title: "Shipment Failed",
+                                                             message: errorMsg,
+                                                             type: "error",
+                                                         });
                                                      } finally {
                                                          setUpdatingStatus(false);
                                                      }

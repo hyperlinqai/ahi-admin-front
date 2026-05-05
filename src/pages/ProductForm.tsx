@@ -6,6 +6,7 @@ import { X, Upload, ChevronLeft, Loader2, Star, Check, Globe, Weight, Trash2, Al
 import { settingsApi } from "../api/settings";
 import imageCompression from "browser-image-compression";
 import TipTapEditor from "../components/TipTapEditor";
+import { useNotificationStore } from "../store/notificationStore";
 
 // ─── Types ───────────────────────────────────────────────────
 interface ProductImage {
@@ -64,6 +65,7 @@ export default function ProductForm() {
     const navigate = useNavigate();
     const isEdit = Boolean(id && id !== "new");
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { addNotification } = useNotificationStore();
 
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(isEdit);
@@ -270,9 +272,21 @@ export default function ProductForm() {
                         imageOrder: existingImages.map(img => img.id)
                     }).catch(console.error);
                 }
+                
+                addNotification({
+                    title: "Product Updated",
+                    message: `${form.title} has been successfully updated`,
+                    type: "success",
+                });
             } else {
                 const res = await api.post("/products", body);
                 productId = res.data.data.id;
+                
+                addNotification({
+                    title: "Product Created",
+                    message: `${form.title} has been successfully published`,
+                    type: "success",
+                });
             }
 
             // Upload new images
@@ -299,12 +313,25 @@ export default function ProductForm() {
                 await api.post(`/products/${productId}/images`, formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
+                
+                addNotification({
+                    title: "Images Uploaded",
+                    message: `${newFiles.length} images added to ${form.title}`,
+                    type: "success",
+                });
+                
                 setUploadingImages(false);
             }
 
             navigate("/products");
         } catch (err: any) {
-            setError(err?.response?.data?.error || err?.response?.data?.message || "Failed to save product");
+            const errorMsg = err?.response?.data?.error || err?.response?.data?.message || "Failed to save product";
+            setError(errorMsg);
+            addNotification({
+                title: "Save Failed",
+                message: errorMsg,
+                type: "error",
+            });
         } finally {
             setSaving(false);
         }

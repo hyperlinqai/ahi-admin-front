@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import toast from "react-hot-toast";
 
 export interface Notification {
     id: string;
@@ -32,6 +33,22 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             read: false,
             createdAt: new Date(),
         };
+
+        // Show visible toast based on type
+        switch (n.type) {
+            case "success":
+                toast.success(n.title);
+                break;
+            case "error":
+                toast.error(n.title);
+                break;
+            case "warning":
+                toast(n.title, { icon: "⚠️" });
+                break;
+            default:
+                toast(n.title, { icon: "ℹ️" });
+        }
+
         set((state) => ({
             notifications: [notification, ...state.notifications].slice(0, 50),
             hasNewAlert: true,

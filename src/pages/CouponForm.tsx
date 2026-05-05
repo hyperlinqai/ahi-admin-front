@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
 import { getCouponById, createCoupon, updateCoupon, Coupon } from "../api/coupons";
-import toast from "react-hot-toast";
+import { useNotificationStore } from "../store/notificationStore";
 
 export default function CouponForm() {
     const { id } = useParams<{ id: string }>();
     const isEditMode = Boolean(id);
     const navigate = useNavigate();
+    const { addNotification } = useNotificationStore();
 
     const [loading, setLoading] = useState(isEditMode);
     const [saving, setSaving] = useState(false);
@@ -53,7 +54,11 @@ export default function CouponForm() {
                         isActive: c.isActive,
                     });
                 } catch (error: any) {
-                    toast.error("Failed to fetch coupon details");
+                    addNotification({
+                        title: "Fetch Failed",
+                        message: "Failed to fetch coupon details",
+                        type: "error",
+                    });
                     navigate("/coupons");
                 } finally {
                     setLoading(false);
@@ -97,14 +102,26 @@ export default function CouponForm() {
             setSaving(true);
             if (isEditMode && id) {
                 await updateCoupon(id, payload);
-                toast.success("Coupon updated successfully");
+                addNotification({
+                    title: "Coupon Updated",
+                    message: `Coupon ${payload.code} has been successfully updated`,
+                    type: "success",
+                });
             } else {
                 await createCoupon(payload);
-                toast.success("Coupon created successfully");
+                addNotification({
+                    title: "Coupon Created",
+                    message: `Coupon ${payload.code} has been successfully created`,
+                    type: "success",
+                });
             }
             navigate("/coupons");
         } catch (error: any) {
-            toast.error(error.response?.data?.error || "Failed to save coupon");
+            addNotification({
+                title: "Save Failed",
+                message: error.response?.data?.error || "Failed to save coupon",
+                type: "error",
+            });
         } finally {
             setSaving(false);
         }
