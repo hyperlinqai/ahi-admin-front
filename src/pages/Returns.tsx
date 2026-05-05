@@ -186,6 +186,7 @@ function RejectModal({
 }) {
     const [note, setNote] = useState("");
     const [submitting, setSubmitting] = useState(false);
+    const { addNotification } = useNotificationStore();
 
     const handleConfirm = async () => {
         if (!note.trim()) { 
