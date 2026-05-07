@@ -8,7 +8,8 @@ import {
     ExternalLink, 
     AlertCircle,
     TrendingDown,
-    IndianRupee
+    IndianRupee,
+    UserX
 } from "lucide-react";
 import api from "../../api/axios";
 
@@ -21,7 +22,7 @@ interface Item {
 
 interface AbandonedRecord {
     id: string;
-    type: "CART" | "ORDER";
+    type: "CART" | "ORDER" | "GUEST_CART";
     orderNumber?: string;
     customerName: string;
     customerEmail: string;
@@ -36,35 +37,73 @@ interface AbandonedRecord {
 interface AbandonedData {
     abandonedOrders: AbandonedRecord[];
     abandonedCarts: AbandonedRecord[];
+    abandonedGuestLeads: AbandonedRecord[];
     summary: {
         totalAbandonedOrders: number;
         totalAbandonedCarts: number;
+        totalAbandonedGuestLeads?: number;
         potentialRevenue: number;
     };
+    thresholds?: {
+        cartHours: number;
+        orderMinutes: number;
+    };
+}
+
+/** Returns badge style classes for each record type */
+function typeBadge(type: AbandonedRecord["type"]) {
+    switch (type) {
+        case "ORDER":       return "bg-orange-50 text-orange-600 border-orange-100";
+        case "CART":        return "bg-blue-50 text-blue-600 border-blue-100";
+        case "GUEST_CART":  return "bg-purple-50 text-purple-600 border-purple-100";
+    }
+}
+
+function typeLabel(type: AbandonedRecord["type"]) {
+    switch (type) {
+        case "ORDER":      return "Order";
+        case "CART":       return "Cart";
+        case "GUEST_CART": return "Guest";
+    }
 }
 
 export default function AbandonedCheckoutsTab() {
     const [data, setData] = useState<AbandonedData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         api.get("/admin/abandoned-checkouts")
             .then(res => setData(res.data.data))
-            .catch(err => console.error("Failed to fetch abandoned checkouts:", err))
+            .catch(err => {
+                console.error("Failed to fetch abandoned checkouts:", err);
+                setError(err?.response?.data?.message || err?.message || "Unknown error");
+            })
             .finally(() => setLoading(false));
     }, []);
 
     if (loading) return <div className="py-20 text-center text-gray-400">Loading abandoned checkouts...</div>;
-    if (!data) return <div className="py-20 text-center text-gray-400">Failed to load data.</div>;
-
-    const allRecords = [...data.abandonedOrders, ...data.abandonedCarts].sort(
-        (a, b) => new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime()
+    if (error) return (
+        <div className="py-20 text-center">
+            <AlertCircle className="w-12 h-12 text-red-300 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-red-500">Failed to load abandoned checkouts</p>
+            <p className="text-xs text-gray-400 mt-1">{error}</p>
+        </div>
     );
+    if (!data) return <div className="py-20 text-center text-gray-400">No data returned.</div>;
+
+    const allRecords = [
+        ...data.abandonedOrders,
+        ...data.abandonedCarts,
+        ...(data.abandonedGuestLeads ?? []),
+    ].sort((a, b) => new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime());
+
+    const totalGuests = data.summary.totalAbandonedGuestLeads ?? data.abandonedGuestLeads?.length ?? 0;
 
     return (
         <div className="space-y-8">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Total Abandoned</p>
                     <div className="flex items-end justify-between">
@@ -84,6 +123,15 @@ export default function AbandonedCheckoutsTab() {
                     </div>
                 </div>
                 <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Guest Leads</p>
+                    <div className="flex items-end justify-between">
+                        <h3 className="text-3xl font-bold text-gray-900">{totalGuests}</h3>
+                        <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
+                            <UserX className="w-5 h-5 text-purple-500" />
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
                     <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Potential Revenue</p>
                     <div className="flex items-end justify-between">
                         <h3 className="text-3xl font-bold text-gray-900">₹{data.summary.potentialRevenue.toLocaleString()}</h3>
@@ -97,13 +145,23 @@ export default function AbandonedCheckoutsTab() {
             {/* Main Table */}
             <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
-                    <h3 className="text-sm font-bold text-gray-900">Recent Abandoned Checkouts</h3>
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-900">Recent Abandoned Checkouts</h3>
+                        {data.thresholds && (
+                            <p className="text-[11px] text-gray-400 mt-0.5">
+                                Carts idle &gt; {data.thresholds.cartHours}h · Orders pending &gt; {data.thresholds.orderMinutes}min
+                            </p>
+                        )}
+                    </div>
                     <div className="flex items-center gap-2">
                         <span className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-orange-50 text-[10px] font-bold text-orange-600 border border-orange-100 uppercase tracking-tight">
                             <ShoppingBag className="w-3 h-3" /> Orders: {data.summary.totalAbandonedOrders}
                         </span>
                         <span className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 text-[10px] font-bold text-blue-600 border border-blue-100 uppercase tracking-tight">
                             <User className="w-3 h-3" /> Carts: {data.summary.totalAbandonedCarts}
+                        </span>
+                        <span className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-50 text-[10px] font-bold text-purple-600 border border-purple-100 uppercase tracking-tight">
+                            <UserX className="w-3 h-3" /> Guests: {totalGuests}
                         </span>
                     </div>
                 </div>
@@ -124,12 +182,8 @@ export default function AbandonedCheckoutsTab() {
                             {allRecords.map((record) => (
                                 <tr key={record.id} className="hover:bg-gray-50/50 transition-colors group">
                                     <td className="px-6 py-4">
-                                        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-tight ${
-                                            record.type === "ORDER" 
-                                            ? "bg-orange-50 text-orange-600 border border-orange-100" 
-                                            : "bg-blue-50 text-blue-600 border border-blue-100"
-                                        }`}>
-                                            {record.type}
+                                        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-tight border ${typeBadge(record.type)}`}>
+                                            {typeLabel(record.type)}
                                         </div>
                                         {record.orderNumber && (
                                             <p className="text-[10px] text-gray-400 mt-1 font-mono">#{record.orderNumber}</p>
@@ -138,7 +192,7 @@ export default function AbandonedCheckoutsTab() {
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col gap-0.5">
                                             <p className="text-[13px] font-bold text-gray-900">{record.customerName}</p>
-                                            <div className="flex items-center gap-3 mt-1">
+                                            <div className="flex flex-wrap items-center gap-3 mt-1">
                                                 <div className="flex items-center gap-1 text-[11px] text-gray-400">
                                                     <Mail className="w-3 h-3" /> {record.customerEmail}
                                                 </div>
@@ -154,12 +208,12 @@ export default function AbandonedCheckoutsTab() {
                                         <div className="flex flex-col">
                                             <span className="text-[13px] font-medium text-gray-700">{record.itemCount} items</span>
                                             <p className="text-[11px] text-gray-400 line-clamp-1 max-w-[200px]">
-                                                {record.items.map(i => i.name).join(", ")}
+                                                {record.items.map(i => i.name).join(", ") || "—"}
                                             </p>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <p className="text-[13px] font-bold text-gray-900">₹{record.totalValue.toLocaleString()}</p>
+                                        <p className="text-[13px] font-bold text-gray-900">₹{Number(record.totalValue).toLocaleString()}</p>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-1.5 text-[12px] text-gray-500">
@@ -180,7 +234,12 @@ export default function AbandonedCheckoutsTab() {
                 {allRecords.length === 0 && (
                     <div className="py-20 text-center text-gray-400 bg-gray-50/20">
                         <AlertCircle className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-                        No abandoned checkouts found.
+                        <p className="text-sm font-medium text-gray-500">No abandoned checkouts found.</p>
+                        {data.thresholds && (
+                            <p className="text-xs text-gray-400 mt-1">
+                                Looking for carts idle &gt;{data.thresholds.cartHours}h and orders pending &gt;{data.thresholds.orderMinutes}min.
+                            </p>
+                        )}
                     </div>
                 )}
             </div>
