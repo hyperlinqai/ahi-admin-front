@@ -67,10 +67,13 @@ function typeLabel(type: AbandonedRecord["type"]) {
     }
 }
 
+import AbandonedCheckoutDetail from "./AbandonedCheckoutDetail";
+
 export default function AbandonedCheckoutsTab() {
     const [data, setData] = useState<AbandonedData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [selectedCheckout, setSelectedCheckout] = useState<AbandonedRecord | null>(null);
 
     useEffect(() => {
         api.get("/admin/abandoned-checkouts")
@@ -91,6 +94,10 @@ export default function AbandonedCheckoutsTab() {
         </div>
     );
     if (!data) return <div className="py-20 text-center text-gray-400">No data returned.</div>;
+
+    if (selectedCheckout) {
+        return <AbandonedCheckoutDetail record={selectedCheckout} onBack={() => setSelectedCheckout(null)} />;
+    }
 
     const allRecords = [
         ...data.abandonedOrders,
@@ -180,7 +187,11 @@ export default function AbandonedCheckoutsTab() {
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {allRecords.map((record) => (
-                                <tr key={record.id} className="hover:bg-gray-50/50 transition-colors group">
+                                <tr 
+                                    key={record.id} 
+                                    className="hover:bg-gray-50/50 transition-colors group cursor-pointer"
+                                    onClick={() => setSelectedCheckout(record)}
+                                >
                                     <td className="px-6 py-4">
                                         <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-tight border ${typeBadge(record.type)}`}>
                                             {typeLabel(record.type)}
@@ -222,7 +233,13 @@ export default function AbandonedCheckoutsTab() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <button className="p-2 rounded-xl border border-gray-100 hover:bg-white hover:shadow-sm transition-all text-gray-400 hover:text-brand-gold-600">
+                                        <button 
+                                            className="p-2 rounded-xl border border-gray-100 hover:bg-white hover:shadow-sm transition-all text-gray-400 hover:text-brand-gold-600"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedCheckout(record);
+                                            }}
+                                        >
                                             <ExternalLink className="w-4 h-4" />
                                         </button>
                                     </td>
