@@ -80,8 +80,8 @@ function App() {
           </Route>
         </Route>
 
-        {/* Catch all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Catch all — send to login (avoids * → / → protected → login loops) */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
   );

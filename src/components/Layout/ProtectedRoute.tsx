@@ -1,15 +1,19 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 
 const ProtectedRoute = () => {
-    const { isAuthenticated, user } = useAuthStore();
+    const { isAuthenticated, user, logout } = useAuthStore();
+    const location = useLocation();
 
-    if (!isAuthenticated || user?.role !== "ADMIN") {
-        // Redirect them to the login page, but save the current location they were
-        // trying to go to when they were redirected. This allows us to send them
-        // along to that page after they login, which is a nicer user experience
-        // than dropping them off on the home page.
-        return <Navigate to="/login" replace />;
+    const isAdmin = isAuthenticated && user?.role === "ADMIN";
+
+    if (!isAdmin) {
+        // Clear storefront / stale sessions so Login does not bounce back to "/"
+        if (isAuthenticated && user?.role !== "ADMIN") {
+            logout();
+        }
+
+        return <Navigate to="/login" replace state={{ from: location }} />;
     }
 
     return <Outlet />;

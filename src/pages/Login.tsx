@@ -12,12 +12,18 @@ export default function Login() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
 
-    const { setAuth, isAuthenticated } = useAuthStore();
+    const { setAuth, isAuthenticated, user, logout } = useAuthStore();
     const location = useLocation();
 
-    if (isAuthenticated) {
+    // Only redirect when this is a valid admin session (avoids / ↔ /login loop with USER tokens)
+    if (isAuthenticated && user?.role === "ADMIN") {
         const from = location.state?.from?.pathname || "/";
-        return <Navigate to={from} replace />;
+        const safeFrom = from === "/login" ? "/" : from;
+        return <Navigate to={safeFrom} replace />;
+    }
+
+    if (isAuthenticated && user?.role !== "ADMIN") {
+        logout();
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
